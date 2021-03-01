@@ -15,7 +15,7 @@ class CIFAR5(datasets.CIFAR10):
     def __init__(self, *args, **kwargs):
         super(CIFAR5, self).__init__(*args, **kwargs)
 
-        #exclude_list = ['cat', 'deer', 'dog', 'frog', 'ship']
+        #exclude_list = ['c.any(axis=1)at', 'deer', 'dog', 'frog', 'ship']
         exclude_list = [3, 4, 5, 6, 8]
 
         if exclude_list == []:
@@ -32,6 +32,7 @@ class CIFAR5(datasets.CIFAR10):
             self.targets = labels.tolist()
 
         else:
+            # test part
             labels = np.array(self.targets)
             exclude = np.array(exclude_list).reshape(1, -1)
             mask = ~(labels.reshape(-1, 1) == exclude).any(axis=1)

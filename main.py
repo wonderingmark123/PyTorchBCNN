@@ -15,16 +15,24 @@ from cifar5 import CIFAR5
 from models import BCNN
 from utils import bcnn_loss
 
+# parameters
 
-batch_size    = 4                   # number of samples per mini-batch
+batch_size    = 64                   # number of samples per mini-batch
 imsize        = 50                  # image size
 params        = [2,4,5]             # [coarse1, coarse2, fine]
-weights       = [0.8,0.1,0.1]       # weights for loss function
-lr0           = torch.tensor(1e-3)  # speed of convergence
+weights       = [0.1,0.3,0.6]       # weights for loss  function
+# weights = [0.8,0.1,0.1] Accuracy: 0.8275
+# weights = [0.2,0.7,0.1] Accuracy: 0.84058
+# weights = [0.1,0.3,0.6] Accuracy: 0.8848
+
+lr0           = torch.tensor(1e-3)  # speed of convergence ( learning rate)
 momentum      = torch.tensor(8e-1)  # momentum for optimizer
 decay         = torch.tensor(1e-6)  # weight decay for regularisation
 random_seed   = 42
+saving_best = True
+Load_model = True
 
+SaveModelFile = 'CIFAR5_model_stat.pt'
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
@@ -32,7 +40,8 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 print("Device: ",device)
-
+weights = torch.from_numpy(np.array(weights))
+print('weights are {}'.format(weights))
 # -----------------------------------------------------------------------------
 
 transform = transforms.Compose([
@@ -56,15 +65,18 @@ classes = ('plane', 'car', 'bird', 'horse', 'truck')
 model = BCNN(in_chan=1, params=params, kernel_size=3)
 learning_rate = lr0
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=decay)
-
+minTestAccs = 1 # if the test accuracy is higher than this, save the current model
 # -----------------------------------------------------------------------------
 
 summary(model, (1, imsize, imsize))
 model = model.to(device)
 
+if Load_model:
+    model.load_state_dict(torch.load(SaveModelFile))
 # -----------------------------------------------------------------------------
 
 epochs = 10
+
 epoch_trainaccs, epoch_testaccs = [], []
 epoch_trainloss, epoch_testloss = [], []
 
@@ -109,6 +121,11 @@ for epoch in range(epochs):
     epoch_testaccs.append(np.mean(test_accs))
     epoch_trainloss.append(np.mean(train_losses))
     epoch_testloss.append(np.mean(test_losses))
+
+    if np.mean(test_accs) < minTestAccs and saving_best:
+        minTestAccs = np.mean(test_accs)
+        print(  )
+        torch.save( model.state_dict(), SaveModelFile)
 
 print("Final test error: ",100.*(1 - epoch_testaccs[-1]))
 

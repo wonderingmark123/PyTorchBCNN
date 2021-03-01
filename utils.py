@@ -3,13 +3,70 @@
 # [AMS - 200601] created
 # -------------------------------------------------------------------------
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from MiraBest import MBFRConfident
+from PIL import Image
+import torchvision.transforms as transforms
 
-import numpy as np
+#  -----------------------------------------------
+# the following part is for MiraBest dataset
+# -------------------------------------------------
+
+def load_data_mira(dataDir = 'mirabest', train=True ,imsize = 150):
+    """
+    Load miraBest data from dataDir. If that doesn't exist, download it.
+
+    imsize: 150                      # pixels on side of image
+    datamean: 0.0031
+    datastd: 0.0350
+    """
+    
+    # -----------------------------------------------------------------------------
+    # Data loading:
+    datamean = 0.0031
+    datastd = 0.0350
+    
+    crop     = transforms.CenterCrop(imsize)
+    pad      = transforms.Pad((0, 0, 1, 1), fill=0)
+    totensor = transforms.ToTensor()
+    normalise= transforms.Normalize(datamean , datastd )
+
+    # transform = transforms.Compose([
+    #         transforms.Grayscale(num_output_channels=1),
+    #         transforms.Resize(50),
+    #         transforms.ToTensor(),
+    #         transforms.Normalize((0.5,), (0.5,))
+    #         ])
+    
+    transform = transforms.Compose([
+        crop,
+        pad,
+        transforms.RandomRotation(360, resample=Image.BILINEAR, expand=False),
+        totensor,
+        normalise,
+    ])
 
 
+    train_data = MBFRConfident(dataDir, train=train, download=True, transform=transform)
+    return train_data
+
+def mira_loss(coarse1, coarse2, f1, y_train, weights, device="cpu" ):
+    """
+        Function to calculate weighted 3 term loss function for BCNN
+    """
+
+
+    
+    return 0
+
+
+
+#  -----------------------------------------------
+# the following part is for CIFAR5 classification 
+# -------------------------------------------------
 def bcnn_loss(c1, c2, f1, y_train, weights, device="cpu"):
     """
         Function to calculate weighted 3 term loss function for BCNN
@@ -30,8 +87,6 @@ def bcnn_loss(c1, c2, f1, y_train, weights, device="cpu"):
     loss = weights[0]*l1 + weights[1]*l2 + weights[2]*l3
 
     return loss
-
-
 def l1_labels(labels):
 
     """
