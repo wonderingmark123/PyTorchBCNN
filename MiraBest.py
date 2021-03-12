@@ -30,6 +30,7 @@ class MiraBest_full(data.Dataset):
         download (bool, optional): If true, downloads the dataset from the internet and
             puts it in root directory. If dataset is already downloaded, it is not
             downloaded again.
+        img size is [150,150]
 
     """
 
@@ -216,6 +217,78 @@ class MBFRConfident(MiraBest_full):
             targets[fr2_mask] = 1 # set all FRII to Class~1
             self.data = self.data[exclude_mask]
             self.targets = targets[exclude_mask].tolist()
+class MBFRConfidentSub(MiraBest_full):
+    
+    """
+    Child class to load only confident FRI (0) & FRII (1)
+    [100, 102, 104] and [200, 201]
+
+    label
+    FR1 : [0, 1, 2]
+    FR2 : [5, 6] -> [3, 4]
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(MBFRConfidentSub, self).__init__(*args, **kwargs)
+
+        fr1_list = [0,1,2]
+        fr2_list = [5,6]
+        exclude_list = [3,4,7,8,9]
+
+        if exclude_list == []:
+            return
+        # if self.train:
+        FR_targets,targets = np.array(self.targets),np.array(self.targets)
+        exclude = np.array(exclude_list).reshape(1, -1)
+        exclude_mask = ~(FR_targets.reshape(-1, 1) == exclude).any(axis=1)
+        fr1 = np.array(fr1_list).reshape(1, -1)
+        fr2 = np.array(fr2_list).reshape(1, -1)
+        fr1_mask = (FR_targets.reshape(-1, 1) == fr1).any(axis=1)
+        fr2_mask = (FR_targets.reshape(-1, 1) == fr2).any(axis=1)
+        FR_targets[fr1_mask] = 0 # set all FRI to Class~0
+        FR_targets[fr2_mask] = 1 # set all FRII to Class~1
+        self.data = self.data[exclude_mask]
+        targets[fr2_mask] = targets[fr2_mask] - 2
+        self.FRtargets = FR_targets[exclude_mask].tolist()
+        self.targets = targets[exclude_mask].tolist()
+
+        # else:
+        #     FR_targets = np.array(self.targets)
+        #     exclude = np.array(exclude_list).reshape(1, -1)
+        #     exclude_mask = ~(FR_targets.reshape(-1, 1) == exclude).any(axis=1)
+        #     fr1 = np.array(fr1_list).reshape(1, -1)
+        #     fr2 = np.array(fr2_list).reshape(1, -1)
+        #     fr1_mask = (FR_targets.reshape(-1, 1) == fr1).any(axis=1)
+        #     fr2_mask = (FR_targets.reshape(-1, 1) == fr2).any(axis=1)
+        #     FR_targets[fr1_mask] = 0 # set all FRI to Class~0
+        #     FR_targets[fr2_mask] = 1 # set all FRII to Class~1
+        #     self.data = self.data[exclude_mask]
+        #     self.FRtargets = FR_targets[exclude_mask].tolist()
+        #     self.targets = np.array(self.targets)[exclude_mask].tolist()
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (image, target) where target is index of the target class.
+        """
+        img, target,FRtarget = self.data[index], self.targets[index],self.FRtargets[index]
+
+        # doing this so that it is consistent with all other datasets
+        # to return a PIL Image
+        img = np.reshape(img,(150,150))
+        img = Image.fromarray(img,mode='L')
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+            FRtarget = self.target_transform(FRtarget)
+
+        return img, target, FRtarget
 
 class MBFRUncertain(MiraBest_full):
 

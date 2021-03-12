@@ -7,13 +7,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from MiraBest import MBFRConfident
+from MiraBest import MBFRConfident, MBFRConfidentSub
 from PIL import Image
 import torchvision.transforms as transforms
 
 #  -----------------------------------------------
 # the following part is for MiraBest dataset
 # -------------------------------------------------
+
+
 
 def load_data_mira(dataDir = 'mirabest', train=True ,imsize = 150):
     """
@@ -29,11 +31,10 @@ def load_data_mira(dataDir = 'mirabest', train=True ,imsize = 150):
     datamean = 0.0031
     datastd = 0.0350
     
-    crop     = transforms.CenterCrop(imsize)
-    pad      = transforms.Pad((0, 0, 1, 1), fill=0)
-    totensor = transforms.ToTensor()
-    normalise= transforms.Normalize(datamean , datastd )
-
+    crop        = transforms.CenterCrop(imsize)
+    pad         = transforms.Pad((0, 0, 1, 1), fill=0)
+    totensor    = transforms.ToTensor()
+    normalise   = transforms.Normalize(datamean , datastd )
     # transform = transforms.Compose([
     #         transforms.Grayscale(num_output_channels=1),
     #         transforms.Resize(50),
@@ -50,17 +51,27 @@ def load_data_mira(dataDir = 'mirabest', train=True ,imsize = 150):
     ])
 
 
-    train_data = MBFRConfident(dataDir, train=train, download=True, transform=transform)
+    train_data = MBFRConfidentSub(dataDir, train=train, download=True, transform=transform)
     return train_data
 
-def mira_loss(coarse1, coarse2, f1, y_train, weights, device="cpu" ):
+def mira_loss(FRPred, MiraPred, FRtarget,Miratarget, weights, device="cpu" ):
     """
         Function to calculate weighted 3 term loss function for BCNN
     """
+    # if device=="cpu":
+    #     y_c1_train = l1_labels(y_train)
+    #     y_c2_train = l2_labels(y_train)
+    # else:
+    #     y_c1_train = l1_labels(y_train.to("cpu")).to(device)
+    #     y_c2_train = l2_labels(y_train.to("cpu")).to(device)
+    #     weights = weights.to(device)
 
+    l1 = F.cross_entropy( FRPred,FRtarget)
+    l2 = F.cross_entropy(MiraPred,Miratarget)
+    # l3 = F.cross_entropy(f1, y_train)
+    loss = weights[0]*l1 + weights[1]*l2
 
-    
-    return 0
+    return loss
 
 
 

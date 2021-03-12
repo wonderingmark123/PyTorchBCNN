@@ -9,39 +9,78 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import datasets, transforms
 from torchsummary import summary
-
+import os
 import numpy as np
 
-from cifar5 import CIFAR5
-from models import BCNN
-from utils import bcnn_loss, load_data_mira
+from models import BCNN,BCNNmira
+from utils import bcnn_loss, load_data_mira,mira_loss
 
 # parameters
 
-batch_size    = 32                 # number of samples per mini-batch
-imsize        = 50                  # image size
-params        = [2,4,5]             # [coarse1, coarse2, fine]
-weights       = [0.1,0.3,0.6]       # weights for loss  function
-# weights = [0.8,0.1,0.1] Accuracy: 0.8275
-# weights = [0.2,0.7,0.1] Accuracy: 0.84058
-# weights = [0.1,0.3,0.6] Accuracy: 0.8848
-
-lr0           = torch.tensor(1e-3)  # speed of convergence ( learning rate)
+batch_size    = 16                 # number of samples per mini-batch
+imsize        = 150                # image size (original image size is [150,150])
+params        = [2,5]             # [coarse1, coarse2]
+weightsList   = ([0.9,0.1],[0.2,0.8])       # weights for loss  function
+TrainLayer    = 1
+lr0           = torch.tensor(1e-4)  # speed of convergence ( learning rate)
 momentum      = torch.tensor(8e-1)  # momentum for optimizer
 decay         = torch.tensor(1e-6)  # weight decay for regularisation
 random_seed   = 42
-saving_best = True
-Load_model = False
-
-SaveModelFile = 'Mira_model_stat.pt'
+saving_best   = True
+Load_epoch    = 93
+kernel_size   = 5
+epochsList    = (100,200)
+SaveModelFile = 'D:\\study\\PyTorchBCNN\\Trained_model\\MiraConfident_kernel5'
 # -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
+def SavingModel(model,optimizer,epoch,MINloss,epoch_testaccs,epoch_testloss,epoch_trainaccs,epoch_trainloss):
+    if not os.path.isdir(SaveModelFile):
+        os.mkdir(SaveModelFile)
+    SaveModelFileNow = os.path.join(SaveModelFile,str(epoch))
+    if not os.path.isdir(SaveModelFileNow):
+        os.mkdir(SaveModelFileNow)
+    state = {'net'      : model.state_dict(), 
+        'optimizer'     : optimizer.state_dict(),
+        'epoch'         : epoch,
+        'batch_size'    : batch_size   ,              # number of samples per mini-batch,
+        'Epochs'        : epochs ,                  # total epochs for training process
+        'learning_rate' : learning_rate,
+        'imsize'        : imsize,
+        'momentum'      : momentum.numpy  ,# momentum for optimizer
+        'decay'         : decay.numpy  ,# weight decay for regularisation
+        'random_seed'   : random_seed,
+        'kernel_size'   : kernel_size, # kenel_size for conv layers    
+        'saving_best'   : saving_best,
+        'SaveModelFile' : SaveModelFile,
+        'MINloss'       : MINloss,
+        'epoch_testaccs': epoch_testaccs,
+        'epoch_testloss': epoch_testloss,
+        'epoch_trainaccs':epoch_trainaccs,
+        'epoch_trainloss':epoch_trainloss,
 
+      }
+    torch.save(state,os.path.join(SaveModelFileNow,'Modelpara.pth'))
+def LoadModel(model,epoch):
+    
+    SaveModelFileNow = os.path.join(SaveModelFile,str(epoch))
+    if not os.path.isdir(SaveModelFileNow):
+        return model,0,0,[],[],[],[]
+    state  = torch.load(os.path.join(SaveModelFileNow,'Modelpara.pth'))
+    model.load_state_dict(state['net'])
+    epoch               = state['epoch']
+    MINloss             = state['MINloss']
+    epoch_testaccs      = state['epoch_testaccs']
+    epoch_testloss      = state['epoch_testloss']
+    epoch_trainloss     = state['epoch_trainloss']
+    epoch_trainaccs     = state['epoch_trainaccs']
+    return model,epoch,epoch_testaccs,epoch_testloss,epoch_trainloss,epoch_trainaccs
+# -----------------------------------------------------------------------------
+epochs   = epochsList[TrainLayer]
+weights  = weightsList[TrainLayer]
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 print("Device: ",device)
-weights = torch.from_numpy(np.array(weights))
+weights = torch.from_numpy(np.array(weights)).to(device)
 print('weights are {}'.format(weights))
 # -----------------------------------------------------------------------------
 
@@ -52,7 +91,6 @@ print('weights are {}'.format(weights))
 trainset = load_data_mira(imsize = imsize)
 
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True)
-
 # testset = CIFAR5(root='./cifar5data', train=False, download=True, transform=transform)
 testset = load_data_mira(train=False,imsize = imsize)
 
@@ -61,39 +99,39 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle
 
 # -----------------------------------------------------------------------------
 
-model = BCNN(in_chan=1, params=params, kernel_size=3)
+model = BCNNmira(in_chan=1, OutputParameters=params, kernel_size= kernel_size ,imsize = imsize)
 learning_rate = lr0
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=decay)
-minTestAccs = 1 # if the test accuracy is higher than this, save the current model
+minTestAccs = 0 # if the test accuracy is higher than this, save the current model
 # -----------------------------------------------------------------------------
 
 summary(model, (1, imsize, imsize))
 model = model.to(device)
 
-if Load_model:
-    model.load_state_dict(torch.load(SaveModelFile))
 # -----------------------------------------------------------------------------
 
-epochs = 10
 
 epoch_trainaccs, epoch_testaccs = [], []
 epoch_trainloss, epoch_testloss = [], []
 
-for epoch in range(epochs):
+if Load_epoch > 0:
+    model,epochNow,epoch_testaccs,epoch_testloss,epoch_trainloss,epoch_trainaccs =LoadModel(model,Load_epoch)
+
+for epoch in range(Load_epoch,epochs):
 
     model.train()
     train_losses, train_accs = [], []; acc = 0
-    for batch, (x_train, y_train) in enumerate(trainloader):
+    for batch, (MiraImage, MiraLabel, FRLabel) in enumerate(trainloader):
 
         model.zero_grad()
-        x_train, y_train = x_train.to(device), y_train.to(device)
-        c1_pred, c2_pred, f1_pred = model(x_train)
+        MiraImage, MiraLabel,FRLabel = MiraImage.to(device), MiraLabel.to(device),FRLabel.to(device)
+        FRPred, MiraPred = model(MiraImage)
 
-        loss = bcnn_loss(c1_pred, c2_pred, f1_pred, y_train, weights, device=device)
+        loss = mira_loss(FRPred, MiraPred,FRLabel,MiraLabel, weights, device=device)
         loss.backward()
         optimizer.step()
 
-        acc = (f1_pred.argmax(dim=-1) == y_train).to(torch.float32).mean()
+        acc = (MiraPred.argmax(dim=-1) == MiraLabel).to(torch.float32).mean()
         train_accs.append(acc.mean().item())
         train_losses.append(loss.item())
 
@@ -103,14 +141,16 @@ for epoch in range(epochs):
 
         model.eval()
         test_losses, test_accs = [], []; acc = 0
-        for i, (x_test, y_test) in enumerate(testloader):
+        for i, (MiraImageTest, MiraLabelTest,FRLabelTest) in enumerate(testloader):
 
-            x_test, y_test = x_test.to(device), y_test.to(device)
-            c1_testpred, c2_testpred, f1_testpred = model(x_test)
+            MiraImageTest, MiraLabelTest,FRLabelTest = MiraImageTest.to(device), MiraLabelTest.to(device),FRLabelTest.to(device)
+            FRLabelTestPre, MiraLabelTestPre = model(MiraImageTest)
 
-            loss = bcnn_loss(c1_testpred, c2_testpred, f1_testpred, y_test, weights, device=device)
-
-            acc = (f1_testpred.argmax(dim=-1) == y_test).to(torch.float32).mean()
+            loss = mira_loss(FRLabelTestPre, MiraLabelTestPre,FRLabelTest, MiraLabelTest, weights, device=device)
+            if TrainLayer == 1 :
+                acc = (MiraLabelTestPre.argmax(dim=-1) == MiraLabelTest).to(torch.float32).mean()
+            if TrainLayer == 0 :
+                acc = (FRLabelTestPre.argmax(dim=-1) == FRLabelTest).to(torch.float32).mean()
             test_losses.append(loss.item())
             test_accs.append(acc.mean().item())
 
@@ -121,12 +161,12 @@ for epoch in range(epochs):
     epoch_trainloss.append(np.mean(train_losses))
     epoch_testloss.append(np.mean(test_losses))
 
-    if np.mean(test_accs) < minTestAccs and saving_best:
+    if np.mean(test_accs) > minTestAccs and saving_best and epoch > 10:
         minTestAccs = np.mean(test_accs)
-        print(  )
-        torch.save( model.state_dict(), SaveModelFile)
-
+        epochNow = epoch
+        print( 'Saving model' )
+        SavingModel(model,optimizer,epoch,minTestAccs,epoch_testaccs,epoch_testloss,epoch_trainaccs,epoch_trainloss)
+SavingModel(model,optimizer,epoch,minTestAccs,epoch_testaccs,epoch_testloss,epoch_trainaccs,epoch_trainloss)
 print("Final test error: ",100.*(1 - epoch_testaccs[-1]))
-
-np.savez("bcnntestloss.npz",np.array(epoch_testloss))
-np.savez("bcnntrainloss.npz",np.array(epoch_trainloss))
+print("Best model Testing accuracy: ",100.*minTestAccs)
+print("Best model Testing epoch: ",epochNow)

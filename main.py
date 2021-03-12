@@ -17,8 +17,8 @@ from utils import bcnn_loss
 
 # parameters
 
-batch_size    = 64                   # number of samples per mini-batch
-imsize        = 50                  # image size
+batch_size    = 2                   # number of samples per mini-batch
+imsize        = 70                  # image size
 params        = [2,4,5]             # [coarse1, coarse2, fine]
 weights       = [0.1,0.3,0.6]       # weights for loss  function
 # weights = [0.8,0.1,0.1] Accuracy: 0.8275
@@ -30,7 +30,7 @@ momentum      = torch.tensor(8e-1)  # momentum for optimizer
 decay         = torch.tensor(1e-6)  # weight decay for regularisation
 random_seed   = 42
 saving_best = True
-Load_model = True
+Load_model = False
 
 SaveModelFile = 'CIFAR5_model_stat.pt'
 # -----------------------------------------------------------------------------
@@ -46,7 +46,7 @@ print('weights are {}'.format(weights))
 
 transform = transforms.Compose([
             transforms.Grayscale(num_output_channels=1),
-            transforms.Resize(50),
+            transforms.Resize(imsize),
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,))
             ])
@@ -62,7 +62,7 @@ classes = ('plane', 'car', 'bird', 'horse', 'truck')
 
 # -----------------------------------------------------------------------------
 
-model = BCNN(in_chan=1, params=params, kernel_size=3)
+model = BCNN(in_chan=1, params=params, kernel_size=3,imsize=imsize)
 learning_rate = lr0
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=decay)
 minTestAccs = 1 # if the test accuracy is higher than this, save the current model
