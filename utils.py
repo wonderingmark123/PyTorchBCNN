@@ -15,6 +15,51 @@ import torchvision.transforms as transforms
 # the following part is for MiraBest dataset
 # -------------------------------------------------
 
+def train(model, trainloader, optimizer, device):
+    
+    train_loss = 0.0
+
+    model.train()
+    for batch_idx, (data, labels) in enumerate(trainloader):
+        data, labels = data.to(device), labels.to(device)
+
+        optimizer.zero_grad()
+
+        p_y = F.softmax(model(data), dim=1)
+        loss = model.loss(p_y, labels)
+            
+        train_loss += loss.item() * data.size(0)
+
+        loss.backward()
+        optimizer.step()
+
+    train_loss /= len(trainloader.dataset)
+    return train_loss
+
+
+def test(model, testloader, device):
+    
+    correct = 0
+    total = 0
+    test_loss = 0.0
+
+    model.eval()
+    with torch.no_grad():
+        for batch_idx, (data, labels) in enumerate(testloader):
+            data, labels = data.to(device), labels.to(device)
+
+            p_y = F.softmax(model(data), dim=1)
+            loss = model.loss(p_y, labels)
+                
+            test_loss += loss.item() * data.size(0)
+
+            preds = p_y.argmax(dim=1, keepdim=True)
+            correct += preds.eq(labels.view_as(preds)).sum().item()
+
+        test_loss /= len(testloader.dataset)
+        accuracy = correct / len(testloader.dataset)
+
+    return test_loss, accuracy
 
 
 def load_data_mira(dataDir = 'mirabest', train=True ,imsize = 150):

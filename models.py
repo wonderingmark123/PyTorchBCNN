@@ -12,6 +12,8 @@ import torch.nn.functional as F
 import numpy as np
 
 from layers import CoarseFR, ConvBlock, CoarseBlock,ConvUnit
+from e2cnn import gspaces
+from e2cnn import nn as e2nn
 
 
 class BCNN(nn.Module):
@@ -58,14 +60,14 @@ class BCNN(nn.Module):
 
         return c1, c2, f1
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------
 class BCNNmira(nn.Module):
     def __init__(self, in_chan, OutputParameters, 
-    kernel_size = 5,
-    imsize      = 150,
-    convPara    = [6,16,32,64] , 
-    FC_FRpara   = [120,84],
-    FC_Mirapara = [120,84]):
+        kernel_size = 5,
+        imsize      = 150,
+        convPara    = [6,16,32,64] , 
+        FC_FRpara   = [120,84],
+        FC_Mirapara = [120,84]):
         super(BCNNmira, self).__init__()
 
         c1_targets, c2_targets = OutputParameters
@@ -149,7 +151,25 @@ class BCNNmira(nn.Module):
 
         return c1, c2
 
-# ---------------------------------------------------------------------------
+    def loss(self,FRPred, MiraPred, FRtarget,Miratarget, weights, device="cpu" ):
+        """
+            Function to calculate weighted 3 term loss function for BCNN
+        """
+        # if device=="cpu":
+        #     y_c1_train = l1_labels(y_train)
+        #     y_c2_train = l2_labels(y_train)
+        # else:
+        #     y_c1_train = l1_labels(y_train.to("cpu")).to(device)
+        #     y_c2_train = l2_labels(y_train.to("cpu")).to(device)
+        #     weights = weights.to(device)
+
+        l1 = F.cross_entropy( FRPred,FRtarget)
+        l2 = F.cross_entropy(MiraPred,Miratarget)
+        # l3 = F.cross_entropy(f1, y_train)
+        loss = weights[0]*l1 + weights[1]*l2
+
+        return loss
+# --------------------------------------------------------------------------
 class BaseCNN(nn.Module):
     def __init__(self, in_chan, params, kernel_size=3):
         super(BaseCNN, self).__init__()
@@ -173,6 +193,214 @@ class BaseCNN(nn.Module):
 
         return f1, f1_pred
 
+class DNSteerableLeNet(nn.Module):
+    def __init__(self, in_chan, out_chan, imsize, kernel_size=5, N=8):
+        super(DNSteerableLeNet, self).__init__()
+        
+        z = 0.5*(imsize - 2)
+        z = int(0.5*(z - 2))
+        
+        self.r2_act = gspaces.FlipRot2dOnR2(N)
+        
+        in_type = e2nn.FieldType(self.r2_act, [self.r2_act.trivial_repr])
+        self.input_type = in_type
+        
+        out_type = e2nn.FieldType(self.r2_act, 6*[self.r2_act.regular_repr])
+        self.mask = e2nn.MaskModule(in_type, imsize, margin=1)
+        self.conv1 = e2nn.R2Conv(in_type, out_type, kernel_size=5, padding=1, bias=False)
+        self.relu1 = e2nn.ReLU(out_type, inplace=True)
+        self.pool1 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+
+        in_type = self.pool1.out_type
+        out_type = e2nn.FieldType(self.r2_act, 16*[self.r2_act.regular_repr])
+        self.conv2 = e2nn.R2Conv(in_type, out_type, kernel_size=5, padding=1, bias=False)
+        self.relu2 = e2nn.ReLU(out_type, inplace=True)
+        self.pool2 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+        
+        self.gpool = e2nn.GroupPooling(out_type)
+
+        self.fc1   = nn.Linear(16*z*z, 120)
+        self.fc2   = nn.Linear(120, 84)
+        self.fc3   = nn.Linear(84, out_chan)
+        
+        self.drop  = nn.Dropout(p=0.5)
+        
+        # dummy parameter for tracking device
+        self.dummy = nn.Parameter(torch.empty(0))
+        
+    def loss(self,p,y):
+        
+        # check device for model:
+        device = self.dummy.device
+        
+        # p : softmax(x)
+        loss_fnc = nn.NLLLoss().to(device=device)
+        loss = loss_fnc(torch.log(p),y)
+        
+        return loss
+     
+    def enable_dropout(self):
+        for m in self.modules():
+            if isinstance(m, nn.Dropout):
+                m.train()
+
+        return
+ 
+    def forward(self, x):
+        
+        x = e2nn.GeometricTensor(x, self.input_type)
+        
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.pool1(x)
+        
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.pool2(x)
+        
+        x = self.gpool(x)
+        x = x.tensor
+        
+        x = x.view(x.size()[0], -1)
+        
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.drop(x)
+        x = self.fc3(x)
+    
+        return x
+
+class DNSteerableMiraSub(nn.Module):
+    def __init__(self, 
+        in_chan       = 1,
+        OutputPara    = [2,5],
+        imsize        = 150,
+        kernel_size   = 5,
+        N             = 16,
+        convPara      = [6,16,32,64], 
+        FC_FRpara     = [120,84],
+        FC_Mirapara   = [120,84]):
+        super(DNSteerableMiraSub, self).__init__()
+        FRout, FineOUT = OutputPara
+        ImsizeFCcoarse = 0.5*(imsize - 2)
+        ImsizeFCcoarse = int(0.5*(ImsizeFCcoarse - 2))
+        ImsizeFCfine   = int(0.5*(0.5*(ImsizeFCcoarse - 2) - 2))
+        self.r2_act = gspaces.FlipRot2dOnR2(N)
+        
+        in_type = e2nn.FieldType(self.r2_act, [self.r2_act.trivial_repr])
+        self.input_type = in_type
+        
+        out_type = e2nn.FieldType(self.r2_act, convPara[0]*[self.r2_act.regular_repr])
+        self.mask = e2nn.MaskModule(in_type, imsize, margin=1)
+        self.conv1 = e2nn.R2Conv(in_type, out_type, kernel_size=kernel_size, padding=1, bias=False)
+        self.relu1 = e2nn.ReLU(out_type, inplace=True)
+        self.pool1 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+
+        in_type = self.pool1.out_type
+        out_type = e2nn.FieldType(self.r2_act, convPara[1]*[self.r2_act.regular_repr])
+        self.conv2 = e2nn.R2Conv(in_type, out_type, kernel_size = kernel_size, padding=1, bias=False)
+        self.relu2 = e2nn.ReLU(out_type, inplace=True)
+        self.pool2 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+        
+        self.gpool1 = e2nn.GroupPooling(out_type)
+
+        self.fc1   = nn.Linear(16*ImsizeFCcoarse*ImsizeFCcoarse, FC_FRpara[0])
+        self.fc2   = nn.Linear(FC_FRpara[0], FC_FRpara[1])
+        self.fc3   = nn.Linear(FC_FRpara[1], FRout)
+        
+        self.drop  = nn.Dropout(p=0.5)
+        
+        in_type = self.pool2.out_type
+        out_type = e2nn.FieldType(self.r2_act, convPara[2]*[self.r2_act.regular_repr])
+        self.conv3 = e2nn.R2Conv(in_type, out_type, kernel_size = kernel_size, padding=1, bias=False)
+        self.relu3 = e2nn.ReLU(out_type, inplace=True)
+        self.pool3 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+
+        in_type = self.pool3.out_type
+        out_type = e2nn.FieldType(self.r2_act, convPara[3]*[self.r2_act.regular_repr])
+        self.conv4 = e2nn.R2Conv(in_type, out_type, kernel_size = kernel_size, padding=1, bias=False)
+        self.relu4 = e2nn.ReLU(out_type, inplace=True)
+        self.pool4 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+        self.gpool2 = e2nn.GroupPooling(out_type)
+
+        self.fc4   = nn.Linear(convPara[3]*ImsizeFCfine*ImsizeFCfine, FC_Mirapara[0])
+        self.fc5   = nn.Linear(FC_Mirapara[0], FC_Mirapara[1])
+        self.fc6   = nn.Linear(FC_Mirapara[1], FineOUT)
+
+        # dummy parameter for tracking device
+        self.dummy = nn.Parameter(torch.empty(0))
+        
+    def loss(self,FRPred, MiraPred, FRtarget,Miratarget, weights, device="cpu"):
+        """
+            same as mira_loss in utils.py 
+            Cross_entropy = softmax + log + NLLLoss
+
+            In E2CNNRadGal, softmax was in train function, so log(p) and NLLLoss are needed here.
+
+            (2021/3/13 haotian song)
+        """
+        # check device for model:
+        # device = self.dummy.device
+        
+        # p : softmax(x)
+        # loss_fnc = nn.NLLLoss().to(device=device)
+        # loss = loss_fnc(torch.log(p),y)
+        l1 = F.cross_entropy( FRPred,FRtarget)
+        l2 = F.cross_entropy(MiraPred,Miratarget)
+        # l3 = F.cross_entropy(f1, y_train)
+        loss = weights[0]*l1 + weights[1]*l2
+        return loss
+     
+    def enable_dropout(self):
+        for m in self.modules():
+            if isinstance(m, nn.Dropout):
+                m.train()
+
+        return
+ 
+    def forward(self, x):
+        
+        x = e2nn.GeometricTensor(x, self.input_type)
+        
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.pool1(x)
+        
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.pool2(x)
+        
+        y = x
+
+        x = self.gpool1(x)
+        x = x.tensor
+        
+        x = x.view(x.size()[0], -1)
+        
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.drop(x)
+        Coarse = self.fc3(x)
+
+
+        x = self.conv3(y)
+        x = self.relu3(x)
+        x = self.pool3(x)
+        
+        x = self.conv4(x)
+        x = self.relu4(x)
+        x = self.pool4(x)
+        
+        x = self.gpool2(x)
+        x = x.tensor
+        x = x.view(x.size()[0], -1)
+
+        x = F.relu(self.fc4(x))
+        x = F.relu(self.fc5(x))
+        x = self.drop(x)
+        Fine = self.fc6(x)
+        
+        return Coarse, Fine
 
 # -----------------------------------------------------------------------------
 
