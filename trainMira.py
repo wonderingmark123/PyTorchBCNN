@@ -14,8 +14,8 @@ from torch.utils.data.dataloader import DataLoader
 
 # parameters
 
-batch_size    = 4                 # number of samples per mini-batch
-num_works     = 2                   # Default: 0
+batch_size    = 2                 # number of samples per mini-batch
+num_works     = 4                   # Default: 0
 PinMemory     = True                # Default: False
 imsize        = 150                # image size (original image size is [150,150])
 params        = [2,5]             # [coarse1, coarse2]
