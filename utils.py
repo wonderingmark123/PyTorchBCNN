@@ -99,6 +99,19 @@ def load_data_mira(dataDir = 'mirabest', train=True ,imsize = 150):
     train_data = MBFRConfidentSub(dataDir, train=train, download=True, transform=transform)
     return train_data
 
+def Conbine_loss(FRPred, MiraPred, Miratarget):
+    """
+        new loss function for hyper classfication
+        Detailed describtion is shown in REFERENCE/NewLossFunction.docx
+        FR1 0 1 2
+        FR2 3 4
+    """
+    FRPred, MiraPred = F.softmax(FRPred,1),F.softmax(MiraPred,1)
+    MiraPred[:,0:2]  = MiraPred[:,0:3] * FRPred[:,0:1]
+    MiraPred[:,3:5]  = MiraPred[:,3:5] * FRPred[:,1:2]
+    return F.cross_entropy(MiraPred,Miratarget)
+
+
 def mira_loss(FRPred, MiraPred, FRtarget,Miratarget, weights, device="cpu" ):
     """
         Function to calculate weighted 3 term loss function for BCNN

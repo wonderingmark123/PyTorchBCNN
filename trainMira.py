@@ -9,13 +9,13 @@ from torchsummary import summary
 import os
 import numpy as np
 from models import BCNN,BCNNmira, DNSteerableMiraSub
-from utils import bcnn_loss, load_data_mira,mira_loss
+from utils import Conbine_loss, bcnn_loss, load_data_mira,mira_loss
 from torch.utils.data.dataloader import DataLoader
 
 # parameters
 
 batch_size    = 2                 # number of samples per mini-batch
-num_works     = 4                   # Default: 0
+num_works     = 0                   # Default: 0
 PinMemory     = True                # Default: False
 imsize        = 150                # image size (original image size is [150,150])
 params        = [2,5]             # [coarse1, coarse2]
@@ -32,6 +32,7 @@ epochsList    = (100,200)
 SaveModelFile = 'D:\\study\\PyTorchBCNN\\Trained_model\\Nrot9DN_kernel5_validation'
 Nrot          = 16                  # parameter for DNSteerableLeNet (DNSteerableMiraSub )
 frac_val      = 0.2
+EnableConLoss = True
 # -----------------------------------------------------------------------------
 def SavingModel(model,optimizer,epoch,MINloss,epoch_testaccs,epoch_testloss,epoch_trainaccs,epoch_trainloss):
     if not os.path.isdir(SaveModelFile):
@@ -85,6 +86,8 @@ def main():
     print('weights are {}'.format(weights))
     # -----------------------------------------------------------------------------
     trainset = load_data_mira(train=True,imsize = imsize)
+
+    # selected frac_val data from training dataset for validation
     if frac_val>0.:
         dataset_size = len(trainset)
         nval = int(frac_val*dataset_size)
@@ -142,8 +145,10 @@ def main():
             model.zero_grad()
             MiraImage, MiraLabel,FRLabel = MiraImage.to(device), MiraLabel.to(device),FRLabel.to(device)
             FRPred, MiraPred = model(MiraImage)
-
-            loss = mira_loss(FRPred, MiraPred,FRLabel,MiraLabel, weights, device=device)
+            if EnableConLoss:
+                loss = Conbine_loss(FRPred, MiraPred,MiraLabel)
+            else:        
+                loss = mira_loss(FRPred, MiraPred,FRLabel,MiraLabel, weights)
             loss.backward()
             optimizer.step()
 
