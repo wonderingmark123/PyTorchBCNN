@@ -14,8 +14,8 @@ from torch.utils.data.dataloader import DataLoader
 
 # parameters
 
-batch_size    = 2                 # number of samples per mini-batch
-num_works     = 0                   # Default: 0
+batch_size    = 4                 # number of samples per mini-batch
+num_works     = 2                   # Default: 0
 PinMemory     = True                # Default: False
 imsize        = 150                # image size (original image size is [150,150])
 params        = [2,5]             # [coarse1, coarse2]
@@ -169,7 +169,10 @@ def main():
                 MiraImageTest, MiraLabelTest,FRLabelTest = MiraImageTest.to(device), MiraLabelTest.to(device),FRLabelTest.to(device)
                 FRLabelTestPre, MiraLabelTestPre = model(MiraImageTest)
 
-                loss = mira_loss(FRLabelTestPre, MiraLabelTestPre,FRLabelTest, MiraLabelTest, weights, device=device)
+                if EnableConLoss:
+                    loss = Conbine_loss(FRPred, MiraPred,MiraLabel)
+                else:        
+                    loss = mira_loss(FRPred, MiraPred,FRLabel,MiraLabel, weights)
                 if TrainLayer == 1 :
                     acc = (MiraLabelTestPre.argmax(dim=-1) == MiraLabelTest).to(torch.float32).mean()
                 if TrainLayer == 0 :
@@ -185,7 +188,7 @@ def main():
         epoch_trainloss.append(np.mean(train_losses))
         epoch_testloss.append(np.mean(test_losses))
         
-        if np.mean(test_accs) > minTestAccs and saving_best and epoch > 10:
+        if np.mean(test_accs) > minTestAccs and saving_best and epoch > 0:
             minTestAccs = np.mean(test_accs)
             epochNow = epoch
             print( 'Saving model ...' )
