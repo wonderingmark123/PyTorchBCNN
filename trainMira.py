@@ -1,7 +1,16 @@
 # -------------------------------------------------------------------------
 # History:
 # [AMS - 200601] created
+# haotian song kaggle 2021/3/21
 # -------------------------------------------------------------------------
+SaveModelFile = 'D:\\study\\PyTorchBCNN\\Trained_model\\Nrot9DN_kernel5_validation'
+MiradataDir   = 'mirabest'
+# -------------------------------------------------------------------------
+# History:
+# [AMS - 200601] created
+# haotian song kaggle 2021/3/21
+# -------------------------------------------------------------------------
+
 
 import torch
 from torch.utils.data.dataset import Subset
@@ -14,22 +23,22 @@ from torch.utils.data.dataloader import DataLoader
 
 # parameters
 
-batch_size    = 2                 # number of samples per mini-batch
+batch_size    = 64                 # number of samples per mini-batch
 num_works     = 4                   # Default: 0
 PinMemory     = True                # Default: False
 imsize        = 150                # image size (original image size is [150,150])
 params        = [2,5]             # [coarse1, coarse2]
-weightsList   = ([0.9,0.1],[0.2,0.8])       # weights for loss  function
-TrainLayer    = 0
+weightsList   = ([1,0],[0.2,0.8])       # weights for loss  function
+TrainLayer    = 1
 lr0           = torch.tensor(1e-4)  # speed of convergence ( learning rate)
 momentum      = torch.tensor(8e-1)  # momentum for optimizer
 decay         = torch.tensor(1e-6)  # weight decay for regularisation
 random_seed   = 42
 saving_best   = True
-Load_epoch    = 0
+Load_epoch    = 99
 kernel_size   = 5
 epochsList    = (100,200)
-SaveModelFile = 'D:\\study\\PyTorchBCNN\\Trained_model\\Nrot9DN_kernel5_validation'
+
 Nrot          = 16                  # parameter for DNSteerableLeNet (DNSteerableMiraSub )
 frac_val      = 0.2
 EnableConLoss = True
@@ -61,9 +70,10 @@ def SavingModel(model,optimizer,epoch,MINloss,epoch_testaccs,epoch_testloss,epoc
     torch.save(state,os.path.join(SaveModelFileNow,'Modelpara.pth'))
 def LoadModel(model,epoch):
     
-    SaveModelFileNow = os.path.join(SaveModelFile,str(epoch))
+    SaveModelFileNow = os.path.join(LoadingFile,str(epoch))
     if not os.path.isdir(SaveModelFileNow):
-        return model,0,0,[],[],[],[]
+        print('error! loading model')
+        return model,0,0,[],[],[]
     state  = torch.load(os.path.join(SaveModelFileNow,'Modelpara.pth'))
     model.load_state_dict(state['net'])
     epoch               = state['epoch']
@@ -85,7 +95,7 @@ def main():
     weights = torch.from_numpy(np.array(weights)).to(device)
     print('weights are {}'.format(weights))
     # -----------------------------------------------------------------------------
-    trainset = load_data_mira(train=True,imsize = imsize)
+    trainset = load_data_mira(train=True,imsize = imsize,dataDir = MiradataDir)
 
     # selected frac_val data from training dataset for validation
     if frac_val>0.:
@@ -116,13 +126,13 @@ def main():
     learning_rate = lr0
     # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=decay)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=2, factor=0.9)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, patience=10, factor=0.9)
 
 
     minTestAccs = 0 # if the test accuracy is higher than this, save the current model
     # -----------------------------------------------------------------------------
 
-    summary(model, (1, imsize, imsize))
+    #     summary(model, (1, imsize, imsize))
     model = model.to(device)
 
     # -----------------------------------------------------------------------------
@@ -132,7 +142,7 @@ def main():
     epoch_trainloss, epoch_testloss = [], []
 
     if Load_epoch > 0:
-        model,epochNow,epoch_testaccs,epoch_testloss,epoch_trainloss,epoch_trainaccs =LoadModel(model,Load_epoch)
+        model,epochNow,epoch_testaccs,epoch_testloss,epoch_trainloss,epoch_trainaccs = LoadModel(model,Load_epoch)
 
     for epoch in range(Load_epoch,epochs):
         # ----------------------------------------------------------
@@ -152,7 +162,11 @@ def main():
             loss.backward()
             optimizer.step()
 
-            acc = (MiraPred.argmax(dim=-1) == MiraLabel).to(torch.float32).mean()
+            #             acc = (MiraPred.argmax(dim=-1) == MiraLabel).to(torch.float32).mean()
+            if TrainLayer == 1 :
+                acc = (MiraPred.argmax(dim=-1) == MiraLabel).to(torch.float32).mean()
+            if TrainLayer == 0 :
+                acc = (FRPred.argmax(dim=-1) == FRLabel).to(torch.float32).mean()
             train_accs.append(acc.mean().item())
             train_losses.append(loss.item() * MiraImage.size(0))
 
