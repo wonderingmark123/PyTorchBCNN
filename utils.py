@@ -108,8 +108,8 @@ def Conbine_loss(FRPred, MiraPred, Miratarget):
     """
     FRPred, MiraPred = F.softmax(FRPred,1),F.softmax(MiraPred,1)
     FinalPred = torch.ones_like(MiraPred)
-    FinalPred[:,0:3]  = MiraPred[:,0:3] * FRPred[:,0:1].grad.zero_()
-    FinalPred[:,3:5]  = MiraPred[:,3:5] * FRPred[:,1:2].grad.zero_()
+    FinalPred[:,0:3]  = MiraPred[:,0:3] * FRPred[:,0:1].detach()
+    FinalPred[:,3:5]  = MiraPred[:,3:5] * FRPred[:,1:2].detach()
     return F.cross_entropy(FinalPred,Miratarget)
 
 
