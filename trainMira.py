@@ -20,10 +20,12 @@ import numpy as np
 from models import BCNN,BCNNmira, DNSteerableMiraSub
 from utils import Conbine_loss, bcnn_loss, load_data_mira,mira_loss
 from torch.utils.data.dataloader import DataLoader
+from resnetMira import ResNetMira
+
 
 # parameters
 
-batch_size    = 64                 # number of samples per mini-batch
+batch_size    = 2                 # number of samples per mini-batch
 num_works     = 4                   # Default: 0
 PinMemory     = True                # Default: False
 imsize        = 150                # image size (original image size is [150,150])
@@ -35,13 +37,14 @@ momentum      = torch.tensor(8e-1)  # momentum for optimizer
 decay         = torch.tensor(1e-6)  # weight decay for regularisation
 random_seed   = 42
 saving_best   = True
-Load_epoch    = 99
+Load_epoch    = 0
 kernel_size   = 5
 epochsList    = (100,200)
 
 Nrot          = 16                  # parameter for DNSteerableLeNet (DNSteerableMiraSub )
 frac_val      = 0.2
 EnableConLoss = True
+torch.backends.cudnn.benchmark = True
 # -----------------------------------------------------------------------------
 def SavingModel(model,optimizer,epoch,MINloss,epoch_testaccs,epoch_testloss,epoch_trainaccs,epoch_trainloss):
     if not os.path.isdir(SaveModelFile):
@@ -123,6 +126,7 @@ def main():
 
     # model = BCNNmira(in_chan=1, OutputParameters=params, kernel_size= kernel_size ,imsize = imsize)
     model = DNSteerableMiraSub(OutputPara=params,imsize= imsize,kernel_size=kernel_size,N= Nrot)
+    model = ResNetMira(kernel_size=kernel_size)
     learning_rate = lr0
     # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=decay)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=decay)

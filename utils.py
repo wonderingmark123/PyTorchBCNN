@@ -114,7 +114,16 @@ def Conbine_loss(FRPred, MiraPred, Miratarget):
         (MiraPred[:,0:3] * FRPred[:,0:1],
         MiraPred[:,3:5] * FRPred[:,1:2]),1
     ),Miratarget)
-
+def LoadModel_path(model,LoadingFile):
+    state  = torch.load(LoadingFile)
+    model.load_state_dict(state['net'])
+    epoch               = state['epoch']
+    MINloss             = state['MINloss']
+    epoch_testaccs      = state['epoch_testaccs']
+    epoch_testloss      = state['epoch_testloss']
+    epoch_trainloss     = state['epoch_trainloss']
+    epoch_trainaccs     = state['epoch_trainaccs']
+    return model,epoch,epoch_testaccs,epoch_testloss,epoch_trainloss,epoch_trainaccs
 
 def mira_loss(FRPred, MiraPred, FRtarget,Miratarget, weights ):
     """
@@ -190,3 +199,9 @@ def l2_labels(labels):
     l2_labels[np.where(labels==4)]=1
 
     return torch.tensor(l2_labels, dtype=torch.long)
+def GetPadding(imsize,kernelSize,stride=1):
+    """
+        get padding value 
+    """
+    return (stride*(imsize - 1)-imsize +
+             kernelSize)/2

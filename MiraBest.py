@@ -242,10 +242,16 @@ class MBFRConfidentSub(MiraBest_full):
         FR_targets,targets = np.array(self.targets),np.array(self.targets)
         exclude = np.array(exclude_list).reshape(1, -1)
         exclude_mask = ~(FR_targets.reshape(-1, 1) == exclude).any(axis=1)
+
+        # 弄成列向量
         fr1 = np.array(fr1_list).reshape(1, -1)
         fr2 = np.array(fr2_list).reshape(1, -1)
+
+        # 筛选满足条件的列向量
         fr1_mask = (FR_targets.reshape(-1, 1) == fr1).any(axis=1)
         fr2_mask = (FR_targets.reshape(-1, 1) == fr2).any(axis=1)
+
+        # 把那些列向量弄成0或者1（对你来说应该就是删除了）
         FR_targets[fr1_mask] = 0 # set all FRI to Class~0
         FR_targets[fr2_mask] = 1 # set all FRII to Class~1
         self.data = self.data[exclude_mask]

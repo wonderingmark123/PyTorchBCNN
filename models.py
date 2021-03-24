@@ -62,7 +62,9 @@ class BCNN(nn.Module):
 
 # ----------------------------------------------------------------------
 class BCNNmira(nn.Module):
-    def __init__(self, in_chan, OutputParameters, 
+    def __init__(self, 
+        in_chan     = 1, 
+        OutputParameters=[2,5], 
         kernel_size = 5,
         imsize      = 150,
         convPara    = [6,16,32,64] , 
