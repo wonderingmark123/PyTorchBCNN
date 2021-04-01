@@ -17,7 +17,7 @@ from torch.utils.data.dataset import Subset
 from torchsummary import summary
 import os
 import numpy as np
-from models import BCNN,BCNNmira, DNSteerableMiraSub
+from models import BCNN,BCNNmira, DNSteerableMiraSub,DNSteerableMiraSubRes
 from utils import Conbine_loss, bcnn_loss, load_data_mira,mira_loss
 from torch.utils.data.dataloader import DataLoader
 from resnetMira import ResNetMira
@@ -125,8 +125,9 @@ def main():
     # -----------------------------------------------------------------------------
 
     # model = BCNNmira(in_chan=1, OutputParameters=params, kernel_size= kernel_size ,imsize = imsize)
-    model = DNSteerableMiraSub(OutputPara=params,imsize= imsize,kernel_size=kernel_size,N= Nrot)
-    model = ResNetMira(kernel_size=kernel_size)
+    # model = DNSteerableMiraSub(OutputPara=params,imsize= imsize,kernel_size=kernel_size,N= Nrot)
+    # model = ResNetMira(kernel_size=kernel_size)
+    model = DNSteerableMiraSubRes(OutputPara=params,imsize= imsize,kernel_size=kernel_size,N= Nrot)
     learning_rate = lr0
     # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=decay)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=decay)
