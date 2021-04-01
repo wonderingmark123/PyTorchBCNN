@@ -465,12 +465,12 @@ def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, d
     """
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=dilation, groups=groups, bias=False, dilation=dilation)
-def conv5x5(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1):
+def conv5x5(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 2):
     """
         3x3 convolution with padding
     """
     return nn.Conv2d(in_planes, out_planes, kernel_size=5, stride=stride,
-                     padding=dilation, groups=groups, bias=False, dilation=dilation)
+                     padding=dilation, groups=groups, bias=False)
 
 
 def conv1x1(in_planes: int, out_planes: int, stride: int = 1):
@@ -485,7 +485,7 @@ class BasicBlock(nn.Module):
         self,
         inplanes: int,
         planes: int,
-        stride: int = 2,
+        stride: int = 1,
         downsample: Optional[nn.Module] = None,
         groups: int = 1,
         base_width: int = 64,
@@ -501,9 +501,10 @@ class BasicBlock(nn.Module):
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv5x5(inplanes, planes, stride)
+        # self.conv1 = conv5x5(inplanes, planes, 2)
         self.bn1 = norm_layer(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv5x5(planes, planes)
+        self.conv2 = conv5x5(planes, planes, stride)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
         self.stride = stride
@@ -605,7 +606,7 @@ class ResNetMira(nn.Module):
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
 
-        self.inplanes = 64
+        self.inplanes = 6
         self.dilation = 1
         if replace_stride_with_dilation is None:
             # each element in the tuple indicates if we should replace
@@ -621,16 +622,16 @@ class ResNetMira(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, convPara[0], layers[0])
-        self.layer2 = self._make_layer(block, convPara[1], layers[1], stride=2,
+        self.layer2 = self._make_layer(block, convPara[1], layers[1], stride=1,
                                        dilate=replace_stride_with_dilation[0])
         self.fc1 = nn.Sequential(
             nn.Linear(convPara[1] * block.expansion, 120),
             nn.Linear(120, 84),
             nn.Linear(84, OutputPara[0])
             )
-        self.layer3 = self._make_layer(block, convPara[2], layers[2], stride=2,
+        self.layer3 = self._make_layer(block, convPara[2], layers[2], stride=1,
                                        dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, convPara[3], layers[3], stride=2,
+        self.layer4 = self._make_layer(block, convPara[3], layers[3], stride=1,
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc2 = nn.Sequential(

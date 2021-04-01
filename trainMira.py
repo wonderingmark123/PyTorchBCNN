@@ -17,16 +17,16 @@ from torch.utils.data.dataset import Subset
 from torchsummary import summary
 import os
 import numpy as np
-from models import BCNN,BCNNmira, DNSteerableMiraSub,DNSteerableMiraSubRes
+from models import BCNN,BCNNmira, DNSteerableMiraSub,DNSteerableMiraSubRes,ResNetMira
 from utils import Conbine_loss, bcnn_loss, load_data_mira,mira_loss
 from torch.utils.data.dataloader import DataLoader
-from resnetMira import ResNetMira
+# from resnetMira import ResNetMira
 
 
 # parameters
 
 batch_size    = 2                 # number of samples per mini-batch
-num_works     = 4                   # Default: 0
+num_works     = 1                   # Default: 0
 PinMemory     = True                # Default: False
 imsize        = 150                # image size (original image size is [150,150])
 params        = [2,5]             # [coarse1, coarse2]
