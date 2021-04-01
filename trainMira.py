@@ -126,8 +126,8 @@ def main():
 
     # model = BCNNmira(in_chan=1, OutputParameters=params, kernel_size= kernel_size ,imsize = imsize)
     # model = DNSteerableMiraSub(OutputPara=params,imsize= imsize,kernel_size=kernel_size,N= Nrot)
-    # model = ResNetMira(kernel_size=kernel_size)
-    model = DNSteerableMiraSubRes(OutputPara=params,imsize= imsize,kernel_size=kernel_size,N= Nrot)
+    model = ResNetMira(kernel_size=7)
+    # model = DNSteerableMiraSubRes(OutputPara=params,imsize= imsize,kernel_size=kernel_size,N= Nrot)
     learning_rate = lr0
     # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=decay)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=decay)

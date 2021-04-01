@@ -299,9 +299,10 @@ class DNSteerableMiraSub(nn.Module):
         self.mask = e2nn.MaskModule(in_type, imsize, margin=1)
         self.conv1 = e2nn.R2Conv(in_type, out_type, kernel_size=kernel_size, padding=1, bias=False)
         self.relu1 = e2nn.ReLU(out_type, inplace=True)
-        self.pool1 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
-
-        in_type = self.pool1.out_type
+        # self.pool1 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+        
+        # in_type = self.pool1.out_type
+        in_type = self.relu1.out_type
         out_type = e2nn.FieldType(self.r2_act, convPara[1]*[self.r2_act.regular_repr])
         self.conv2 = e2nn.R2Conv(in_type, out_type, kernel_size = kernel_size, padding=1, bias=False)
         self.relu2 = e2nn.ReLU(out_type, inplace=True)
@@ -319,9 +320,10 @@ class DNSteerableMiraSub(nn.Module):
         out_type = e2nn.FieldType(self.r2_act, convPara[2]*[self.r2_act.regular_repr])
         self.conv3 = e2nn.R2Conv(in_type, out_type, kernel_size = kernel_size, padding=1, bias=False)
         self.relu3 = e2nn.ReLU(out_type, inplace=True)
-        self.pool3 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
-
-        in_type = self.pool3.out_type
+        # self.pool3 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+        
+        # in_type = self.pool3.out_type
+        in_type = self.relu3.out_type
         out_type = e2nn.FieldType(self.r2_act, convPara[3]*[self.r2_act.regular_repr])
         self.conv4 = e2nn.R2Conv(in_type, out_type, kernel_size = kernel_size, padding=1, bias=False)
         self.relu4 = e2nn.ReLU(out_type, inplace=True)
@@ -369,7 +371,7 @@ class DNSteerableMiraSub(nn.Module):
         
         x = self.conv1(x)
         x = self.relu1(x)
-        x = self.pool1(x)
+        # x = self.pool1(x)
         
         x = self.conv2(x)
         x = self.relu2(x)
@@ -390,7 +392,7 @@ class DNSteerableMiraSub(nn.Module):
 
         x = self.conv3(y)
         x = self.relu3(x)
-        x = self.pool3(x)
+        # x = self.pool3(x)
         
         x = self.conv4(x)
         x = self.relu4(x)
@@ -463,6 +465,12 @@ def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, d
     """
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=dilation, groups=groups, bias=False, dilation=dilation)
+def conv5x5(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1):
+    """
+        3x3 convolution with padding
+    """
+    return nn.Conv2d(in_planes, out_planes, kernel_size=5, stride=stride,
+                     padding=dilation, groups=groups, bias=False, dilation=dilation)
 
 
 def conv1x1(in_planes: int, out_planes: int, stride: int = 1):
@@ -477,7 +485,7 @@ class BasicBlock(nn.Module):
         self,
         inplanes: int,
         planes: int,
-        stride: int = 1,
+        stride: int = 2,
         downsample: Optional[nn.Module] = None,
         groups: int = 1,
         base_width: int = 64,
@@ -492,10 +500,10 @@ class BasicBlock(nn.Module):
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
-        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.conv1 = conv5x5(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
+        self.conv2 = conv5x5(planes, planes)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
         self.stride = stride
@@ -677,7 +685,7 @@ class ResNetMira(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
+        # x = self.maxpool(x)
 
         x = self.layer1(x)
         x = self.layer2(x)
@@ -697,10 +705,6 @@ class ResNetMira(nn.Module):
 
 
 class DNSteerableMiraSubRes(nn.Module):
-    """
-        This model is unfinished because of pooling part! 
-        Current plan: Remove Pooling part
-    """
     def __init__(self, 
         in_chan       = 1,
         OutputPara    = [2,5],
@@ -724,9 +728,10 @@ class DNSteerableMiraSubRes(nn.Module):
         self.mask = e2nn.MaskModule(in_type, imsize, margin=1)
         self.conv1 = e2nn.R2Conv(in_type, out_type, kernel_size=kernel_size, padding=1, bias=False)
         self.relu1 = e2nn.ReLU(out_type, inplace=True)
-        self.pool1 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
-
-        in_type = self.pool1.out_type
+        # self.pool1 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+        
+        # in_type = self.pool1.out_type
+        in_type = self.relu1.out_type
         out_type = e2nn.FieldType(self.r2_act, convPara[1]*[self.r2_act.regular_repr])
         self.conv2 = e2nn.R2Conv(in_type, out_type, kernel_size = kernel_size, padding=1, bias=False)
         self.relu2 = e2nn.ReLU(out_type, inplace=True)
@@ -744,9 +749,10 @@ class DNSteerableMiraSubRes(nn.Module):
         out_type = e2nn.FieldType(self.r2_act, convPara[2]*[self.r2_act.regular_repr])
         self.conv3 = e2nn.R2Conv(in_type, out_type, kernel_size = kernel_size, padding=1, bias=False)
         self.relu3 = e2nn.ReLU(out_type, inplace=True)
-        self.pool3 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
-
-        in_type = self.pool3.out_type
+        # self.pool3 = e2nn.PointwiseMaxPoolAntialiased(out_type, kernel_size=2)
+        
+        # in_type = self.pool3.out_type
+        in_type = self.relu3.out_type
         out_type = e2nn.FieldType(self.r2_act, convPara[3]*[self.r2_act.regular_repr])
         self.conv4 = e2nn.R2Conv(in_type, out_type, kernel_size = kernel_size, padding=1, bias=False)
         self.relu4 = e2nn.ReLU(out_type, inplace=True)
@@ -792,12 +798,15 @@ class DNSteerableMiraSubRes(nn.Module):
         
         x = e2nn.GeometricTensor(x, self.input_type)
         
+        res = x
+
         x = self.conv1(x)
         x = self.relu1(x)
-        x = self.pool1(x)
-        
+        # x = self.pool1(x)
+        x += res
         x = self.conv2(x)
         x = self.relu2(x)
+        x += res
         x = self.pool2(x)
         
         y = x
@@ -815,10 +824,11 @@ class DNSteerableMiraSubRes(nn.Module):
 
         x = self.conv3(y)
         x = self.relu3(x)
-        x = self.pool3(x)
-        
+        # x = self.pool3(x)
+        x += y
         x = self.conv4(x)
         x = self.relu4(x)
+        x += y
         x = self.pool4(x)
         
         x = self.gpool2(x)
